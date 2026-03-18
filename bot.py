@@ -79,6 +79,21 @@ def ensure_user_exists(user_info):
     except Exception as e:
         logger.error(f"Ошибка при добавлении пользователя: {e}")
 
+def get_full_name(user_id):
+    """Получить полное имя из таблицы Employees"""
+    try:
+        employees_sheet = spreadsheet.worksheet('Employees')
+        cell = employees_sheet.find(str(user_id), in_column=1)
+
+        if cell:
+            row = employees_sheet.row_values(cell.row)
+            if len(row) >= 3:
+                return row[2]
+    except:
+        pass
+
+    return None
+
 def get_today_records(user_id):
     """Получить записи пользователя за сегодня"""
     try:
