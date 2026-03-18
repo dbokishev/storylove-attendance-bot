@@ -305,7 +305,12 @@ def main():
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     application.add_error_handler(error_handler)
 
-    application.run_polling(allowed_updates=Update.ALL_TYPES)
+    import asyncio
+    try:
+        asyncio.run(application.run_polling(allowed_updates=Update.ALL_TYPES))
+    except RuntimeError:
+        application.run_polling(allowed_updates=Update.ALL_TYPES)
+
 
 if __name__ == '__main__':
     main()
