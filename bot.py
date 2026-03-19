@@ -1,11 +1,13 @@
 import os
 import json
 import logging
+import asyncio
 from datetime import datetime
 import pytz
 from dotenv import load_dotenv
 
 load_dotenv()
+from aiohttp import web
 from telegram import Update, ReplyKeyboardMarkup, KeyboardButton
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 import gspread
@@ -298,6 +300,25 @@ async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обработчик ошибок"""
     logger.error(f"Update {update} caused error {context.error}")
 
+async def health_check(request):
+    """Health check endpoint для Render"""
+    return web.Response(text="OK")
+
+async def start_web_server():
+    """Запуск веб-сервера для health check"""
+    app = web.Application()
+    app.router.add_get('/health', health_check)
+    app.router.add_get('/', health_check)
+
+    runner = web.AppRunner(app)
+    await runner.setup()
+
+    port = int(os.getenv('PORT', 8080))
+    site = web.TCPSite(runner, '0.0.0.0', port)
+    await site.start()
+
+    logger.info(f"Health check server запущен на порту {port}")
+
 async def main():
     """Запуск бота"""
     global spreadsheet
@@ -314,6 +335,8 @@ async def main():
 
     logger.info("Бот запущен и подключен к Google Sheets")
 
+    await start_web_server()
+
     application = Application.builder().token(token).build()
 
     application.add_handler(CommandHandler("start", start))
@@ -324,10 +347,8 @@ async def main():
     await application.start()
     await application.updater.start_polling()
 
-    import asyncio
     await asyncio.Event().wait()
 
 
 if __name__ == '__main__':
-    import asyncio
     asyncio.run(main())
