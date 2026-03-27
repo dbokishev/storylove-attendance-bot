@@ -306,10 +306,6 @@ async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def morning_reminder(context: ContextTypes.DEFAULT_TYPE):
     """Утреннее напоминание в 9:00 — отметить приход"""
-    now = get_current_datetime()
-    if now.weekday() >= 5:
-        return
-
     message = (
         "🌅 Доброе утро!\n\n"
         "Не забудь отметиться, когда придёшь на работу — "
@@ -331,10 +327,6 @@ async def morning_reminder(context: ContextTypes.DEFAULT_TYPE):
 
 async def evening_reminder(context: ContextTypes.DEFAULT_TYPE):
     """Вечернее напоминание в 19:00 — отметить уход"""
-    now = get_current_datetime()
-    if now.weekday() >= 5:
-        return
-
     message = (
         "🌇 Рабочий день подходит к концу!\n\n"
         "Не забудь отметиться, когда будешь уходить — "
