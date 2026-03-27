@@ -2,7 +2,7 @@ import os
 import json
 import logging
 import asyncio
-from datetime import datetime
+from datetime import datetime, time as dt_time
 import pytz
 from dotenv import load_dotenv
 
@@ -12,6 +12,8 @@ from telegram import Update, ReplyKeyboardMarkup, KeyboardButton
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 import gspread
 from google.oauth2.service_account import Credentials
+
+active_chat_ids: set[int] = set()
 
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -164,6 +166,7 @@ def get_keyboard():
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обработчик команды /start"""
     user_info = get_user_info(update)
+    active_chat_ids.add(update.effective_chat.id)
 
     ensure_user_exists(user_info)
 
@@ -282,6 +285,7 @@ async def handle_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обработчик текстовых сообщений"""
+    active_chat_ids.add(update.effective_chat.id)
     text = update.message.text
 
     if text == "✅ Я пришел":
@@ -299,6 +303,56 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обработчик ошибок"""
     logger.error(f"Update {update} caused error {context.error}")
+
+async def morning_reminder(context: ContextTypes.DEFAULT_TYPE):
+    """Утреннее напоминание в 9:00 — отметить приход"""
+    now = get_current_datetime()
+    if now.weekday() >= 5:
+        return
+
+    message = (
+        "🌅 Доброе утро!\n\n"
+        "Не забудь отметиться, когда придёшь на работу — "
+        "нажми кнопку «✅ Я пришел».\n\n"
+        "💡 Почему важно отмечаться вовремя?\n"
+        "От количества отработанных часов формируется окладная часть. "
+        "Если ты забудешь отметиться — день не будет засчитан. "
+        "Таковы правила."
+    )
+
+    for chat_id in list(active_chat_ids):
+        try:
+            await context.bot.send_message(
+                chat_id=chat_id, text=message, reply_markup=get_keyboard()
+            )
+        except Exception as e:
+            logger.warning(f"Не удалось отправить утреннее напоминание {chat_id}: {e}")
+            active_chat_ids.discard(chat_id)
+
+async def evening_reminder(context: ContextTypes.DEFAULT_TYPE):
+    """Вечернее напоминание в 19:00 — отметить уход"""
+    now = get_current_datetime()
+    if now.weekday() >= 5:
+        return
+
+    message = (
+        "🌇 Рабочий день подходит к концу!\n\n"
+        "Не забудь отметиться, когда будешь уходить — "
+        "нажми кнопку «🚪 Я ушел».\n\n"
+        "💡 Почему важно отмечаться вовремя?\n"
+        "От количества отработанных часов формируется окладная часть. "
+        "Если ты забудешь отметиться — день не будет засчитан. "
+        "Таковы правила."
+    )
+
+    for chat_id in list(active_chat_ids):
+        try:
+            await context.bot.send_message(
+                chat_id=chat_id, text=message, reply_markup=get_keyboard()
+            )
+        except Exception as e:
+            logger.warning(f"Не удалось отправить вечернее напоминание {chat_id}: {e}")
+            active_chat_ids.discard(chat_id)
 
 async def health_check(request):
     """Health check endpoint для Render"""
@@ -342,6 +396,11 @@ async def main():
     application.add_handler(CommandHandler("start", start))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     application.add_error_handler(error_handler)
+
+    job_queue = application.job_queue
+    job_queue.run_daily(morning_reminder, time=dt_time(hour=9, minute=0, tzinfo=TIMEZONE))
+    job_queue.run_daily(evening_reminder, time=dt_time(hour=19, minute=0, tzinfo=TIMEZONE))
+    logger.info("Напоминания запланированы: 09:00 и 19:00 (Asia/Almaty)")
 
     await application.initialize()
     await application.start()
