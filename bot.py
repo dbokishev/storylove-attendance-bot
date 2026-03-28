@@ -53,6 +53,18 @@ def init_google_sheets():
 
 spreadsheet = None
 
+def load_chat_ids():
+    """Загрузить chat_id всех пользователей из Google Sheets при старте"""
+    try:
+        users_sheet = spreadsheet.worksheet('Users')
+        user_ids = users_sheet.col_values(1)[1:]
+        for uid in user_ids:
+            if uid:
+                active_chat_ids.add(int(uid))
+        logger.info(f"Загружено {len(active_chat_ids)} chat_id из Users")
+    except Exception as e:
+        logger.error(f"Ошибка загрузки chat_id: {e}")
+
 def get_current_datetime():
     """Получить текущие дату и время в нужном часовом поясе"""
     return datetime.now(TIMEZONE)
@@ -379,6 +391,7 @@ async def main():
         logger.error("Не удалось подключиться к Google Sheets!")
         return
 
+    load_chat_ids()
     logger.info("Бот запущен и подключен к Google Sheets")
 
     await start_web_server()
